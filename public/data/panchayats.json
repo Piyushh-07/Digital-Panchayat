@@ -1,0 +1,16 @@
+[
+  { "name": "Bawania", "district": "Mahendragarh", "state": "Haryana" },
+  { "name": "Kothal Kalan", "district": "Mahendragarh", "state": "Haryana" },
+  { "name": "Larahi", "district": "Hazaribagh", "state": "Jharkhand" },
+  { "name": "Dhango", "district": "Sitamarhi", "state": "Bihar" },
+  { "name": "Rampur", "district": "Shimla", "state": "Himachal Pradesh" },
+  { "name": "Chak Ganjaria", "district": "Lucknow", "state": "Uttar Pradesh" },
+  { "name": "Rohtas", "district": "Rohtas", "state": "Bihar" },
+  { "name": "Sikandarpur", "district": "Ballia", "state": "Uttar Pradesh" },
+  { "name": "Barhampur", "district": "Buxar", "state": "Bihar" },
+  { "name": "Maner", "district": "Patna", "state": "Bihar" },
+  { "name": "Gopalganj", "district": "Gopalganj", "state": "Bihar" },
+  { "name": "Supaul", "district": "Supaul", "state": "Bihar" },
+  { "name": "Madhubani", "district": "Madhubani", "state": "Bihar" },
+  { "name": "Purnia", "district": "Purnia", "state": "Bihar" }
+]

@@ -1,0 +1,8 @@
+{
+  "name": "Nagar Panchayat Smart Governance",
+  "description": "A comprehensive digital governance platform for Nagar Panchayats featuring AI-based grievance redressal, role-based workflows for Sachivs and DMs, and real-time SLA tracking.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
