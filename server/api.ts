@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { User, Panchayat, Complaint } from './models';
 import { authMiddleware, roleMiddleware } from './middleware';
 import * as turf from '@turf/turf';
+import { GoogleGenAI, Type } from "@google/genai";
 
 const router = Router();
 
@@ -14,6 +15,76 @@ const dbCheck = (req: any, res: any, next: any) => {
 };
 
 router.use(dbCheck);
+
+let ai: GoogleGenAI | null = null;
+function getAI() {
+  if (!ai && process.env.GEMINI_API_KEY) {
+    ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return ai;
+}
+
+async function analyzeComplaintText(text: string) {
+  const genAI = getAI();
+  if (!genAI) {
+    console.warn('[AI] GEMINI_API_KEY not configured, using fallback analysis');
+    return {
+      isSpam: false,
+      reason: 'AI key not configured',
+      suggestedCategory: 'Other',
+      suggestedPriority: 'Medium'
+    };
+  }
+
+  try {
+    const response = await genAI.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Analyze this complaint for a local government portal: "${text}"`,
+      config: {
+        systemInstruction: "You are an expert government administrator. Categorize the issue and detect spam or harmful content. Categories: Water, Electricity, Roads, Sanitation, Health, Education, Other.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isSpam: { type: Type.BOOLEAN },
+            reason: { type: Type.STRING },
+            suggestedCategory: { type: Type.STRING },
+            suggestedPriority: { 
+              type: Type.STRING,
+              enum: ['Low', 'Medium', 'High']
+            }
+          },
+          required: ['isSpam', 'reason', 'suggestedCategory', 'suggestedPriority']
+        }
+      }
+    });
+    
+    if (response && (response as any).text) {
+      return JSON.parse((response as any).text);
+    }
+    throw new Error('No response from AI');
+  } catch (err) {
+    console.error('AI Analysis Error:', err);
+    return { 
+      isSpam: false, 
+      reason: 'Analysis failed', 
+      suggestedCategory: 'Other', 
+      suggestedPriority: 'Medium' 
+    };
+  }
+}
+
+// --- AI Proxy Route ---
+router.post('/ai/analyze', authMiddleware, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ message: 'Text is required' });
+    const result = await analyzeComplaintText(text);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ message: 'AI Analysis failed', error: err.message });
+  }
+});
 
 // --- Auth Routes ---
 router.post('/auth/signup', async (req: any, res) => {
@@ -84,13 +155,27 @@ router.post('/complaints', authMiddleware, async (req: any, res) => {
     const { title, description, category, location, media, priority, isAnonymous, isDirectToDM } = req.body;
     const user = (req as any).user;
 
+    console.log(`[API] Creating complaint for user: ${user.id} (${user.role})`);
+    
     // SLA Logic: Resolution within 7 days by default
     const slaDeadline = new Date();
     slaDeadline.setDate(slaDeadline.getDate() + 7);
 
     if (mongoose.connection.readyState === 1) {
+      if (!user.panchayatId && user.role !== 'dm') {
+        console.error('[API] User has no panchayatId associated');
+        return res.status(400).json({ message: 'Your account is not associated with any village. Please update your profile or contact admin.' });
+      }
+
       const complaint = new Complaint({
-        title, description, category, location, media,
+        title, 
+        description, 
+        category, 
+        location: {
+          address: location?.address || '',
+          coordinates: location?.coordinates || [0, 0]
+        }, 
+        media,
         priority: isDirectToDM ? 'High' : (priority || 'Medium'),
         citizenId: user.id,
         panchayatId: user.panchayatId,
@@ -99,13 +184,21 @@ router.post('/complaints', authMiddleware, async (req: any, res) => {
         isDirectToDM,
         slaDeadline
       });
+      
       await complaint.save();
+      console.log(`[API] Complaint saved successfully: ${complaint._id}`);
       return res.status(201).json(complaint);
     } else {
+      console.log('[API] Using Demo Mode fallback for complaint creation');
       // Demo Mode Fallback
       const newComplaint = {
         _id: 'c_' + Date.now(),
-        title, description, category, location, media,
+        title, description, category, 
+        location: {
+          address: location?.address || '',
+          coordinates: location?.coordinates || [0, 0]
+        }, 
+        media,
         priority: isDirectToDM ? 'High' : (priority || 'Medium'),
         citizenId: { _id: user.id, name: user.name || 'Demo Citizen' },
         panchayatId: user.panchayat || req.mockDB.panchayats[0],
@@ -119,7 +212,12 @@ router.post('/complaints', authMiddleware, async (req: any, res) => {
       return res.status(201).json(newComplaint);
     }
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[API ERROR] Complaint creation failed:', err);
+    res.status(500).json({ 
+      message: 'Failed to submit complaint', 
+      error: err.message,
+      details: err.stack
+    });
   }
 });
 

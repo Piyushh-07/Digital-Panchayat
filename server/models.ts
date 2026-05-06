@@ -38,7 +38,8 @@ const complaintSchema = new Schema({
   },
   location: {
     address: String,
-    coordinates: [Number] // [longitude, latitude]
+    type: { type: String, default: 'Point' },
+    coordinates: { type: [Number], required: true } // [longitude, latitude]
   },
   media: [{ type: String }],
   citizenId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -68,5 +69,5 @@ const complaintSchema = new Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-complaintSchema.index({ location: '2dsphere' });
+complaintSchema.index({ 'location.coordinates': '2dsphere' });
 export const Complaint = model('Complaint', complaintSchema);

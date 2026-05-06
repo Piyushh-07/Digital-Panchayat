@@ -35,7 +35,7 @@ const NewComplaint: React.FC<{ onSuccess: () => void; onCancel: () => void }> = 
       address: '',
       coordinates: [77.2090, 28.6139] as [number, number] // [lng, lat] - Default Delhi
     },
-    mediaUrls: [] as string[]
+    media: [] as string[]
   });
 
   useEffect(() => {
@@ -78,7 +78,11 @@ const NewComplaint: React.FC<{ onSuccess: () => void; onCancel: () => void }> = 
     setError('');
 
     try {
-      await axios.post('/api/complaints', formData);
+      const payload = {
+        ...formData,
+        media: formData.media
+      };
+      await axios.post('/api/complaints', payload);
       onSuccess();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to submit complaint');
